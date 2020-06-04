@@ -5,7 +5,7 @@ import turtle
 # Conversion constants
 POINT2IN = 1/72
 POINT2MM = POINT2IN*25.4
-RESOLUTION = 3 # Resolution When interpolating points from Bezier curve. 
+RESOLUTION = 6 # Resolution When interpolating points from Bezier curve. 
 
 # Regex
 numPattern = r'[0-9\.\-]+'													# Number pattern
@@ -142,8 +142,8 @@ class Bezier:
 		'resolution' parameter determines how many intervals to plot per points.
 		"""
 		ints = ceil(self.p1.distance(self.p3)/resolution)
-		if(ints < 3):
-			ints = 3
+		if(ints < 1):
+			ints = 1
 
 		self.points = [self.deCasteljaus(i/ints) for i in range(ints+1)]
 		print(self)
@@ -165,9 +165,13 @@ class Bezier:
 		"""
 		turtle.penup()
 		turtle.pencolor("blue")
+		count = 0
 		for i in self.getBezierPoints():
+			if(count == 2):
+				turtle.pencolor("green")
 			turtle.goto(i.x, i.y)
 			turtle.dot()
+			count += 1
 
 class Path:
 
@@ -226,6 +230,7 @@ class Path:
 		turtle.penup()
 		turtle.goto(self.origin.x, self.origin.y)
 		turtle.pendown()
+		t.pencolor("black")
 		for points in self.beziers:
 			for i in points.points:
 				turtle.goto(i.x, i.y)
@@ -235,12 +240,14 @@ class Path:
 		turtle.penup()
 		turtle.goto(self.origin.x, self.origin.y)
 		turtle.pendown()
+		turtle.pencolor("black")
 		for points in self.beziers:
 			for i in points.getBezierPoints():
 				turtle.goto(i.x, i.y)
+
 		turtle.penup()
 
-fileName = 'test.eps'
+fileName = 'thicc.eps'
 with open(fileName, 'r') as file:
 	data = file.read()
 	file.close()
@@ -254,14 +261,17 @@ beziersData = re.findall(bezierPattern, x, flags=re.M|re.S)
 
 p = Path(originData, beziersData)
 
-p.move(-500,-500)
+p.move(-480,-530)
+p.scale(8)
+
+# Need [Point(-323.852, -341.181), Point(299.833, 371.723)]
 i = p.beziers[10]
 print(i)
 #[print(i) for i in p.beziers]
 #print(p.getBounds())
 t = turtle
-p.scale(4)
-p.plot()
-input()
-
+t.speed(10)
+p.plotBezier()
+[x.plot() for x in p.beziers]
+[x.plotBezier() for x in p.beziers]
 
