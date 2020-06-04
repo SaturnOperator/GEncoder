@@ -1,10 +1,11 @@
 import re
-from math import sqrt
+from math import sqrt, ceil
 import turtle
 
 # Conversion constants
 POINT2IN = 1/72
 POINT2MM = POINT2IN*25.4
+RESOLUTION = 3 # Resolution When interpolating points from Bezier curve. 
 
 # Regex
 numPattern = r'[0-9\.\-]+'													# Number pattern
@@ -66,8 +67,17 @@ class Point:
 		return [self.x, self.y]
 
 class Bezier:
+	"""
+	Bezier curve. 
+		- Defined by 3 points: self.p1, self.p2, self.p3
+		- self.points is an array with the interpolated xy points of the bezier curve
+	"""
 
 	def __init__(self, string=None, p1=None, p2=None, p3=None, p1x=None, p1y=None, p2x=None, p2y=None, p3x=None, p3y=None):
+		# Constructor, take different kinds of inputs:
+		#	1) String of string="x.x y.y x.x y.y x.x y.y"
+		#	2) 3 Point classes: p1=Point(x,y) ... p3=Point(x,y)
+		#	3) all individual points: p1x=x, p1y=y, ... p3x=x, p3y=y
 		if (not string == None):
 			cords = re.findall(numPattern, string)
 			if(len(cords) == 6):
@@ -87,10 +97,13 @@ class Bezier:
 		else:
 			raise ValueError
 
+		self.interpolate()
+
 	def move(self, dx, dy):
 		self.p1.move(dx, dy)
 		self.p2.move(dx, dy)
 		self.p3.move(dx, dy)
+		self.interpolate()
 
 	def scale(self, dx, dy=None):
 		if(dy == None):
@@ -98,6 +111,7 @@ class Bezier:
 		self.p1.scale(dx, dy)
 		self.p2.scale(dx, dy)
 		self.p3.scale(dx, dy)
+		self.interpolate()
 
 	def __str__(self):
 		return "Bezier Curve { P1: %s, P2: %s, P3: %s }" % (self.p1, self.p2, self.p3)
@@ -105,23 +119,55 @@ class Bezier:
 	def __repr__(self):
 		return str(self)
 
-	def getPoints(self):
+	def getBezierPoints(self):
 		return [self.p1, self.p2, self.p3]
 
 	def deCasteljaus(self, t):
-		# P = P1*(1-t)^2 + 2*P2*(1-t)t + P3*t^2
+		"""
+		De Casteljau’s algorithm for interpolating points from the Bezier curve. t is an interval between 0.0 - 1.0. 
+		To render the curve you have to interpolate at several intervals. 
+		The more intervals you interpolate at, the higher the resolution of the curve. 
+
+		Equation: P = P1*(1-t)^2 + 2*P2*(1-t)t + P3*t^2
+		"""
+		
 		x = self.p1.x*(1-t)**2 + 2*self.p2.x*t*(1-t) + self.p3.x*t**2
 		y = self.p1.y*(1-t)**2 + 2*self.p2.y*t*(1-t) + self.p3.y*t**2
 
-		print("t = %f : (%0.3f, %0.3f)" % (t, x, y))
-		return [x, y]
+		return Point(x, y)
+
+	def interpolate(self, resolution=RESOLUTION):
+		"""
+		Interpolates the xy coordinates of the Bezier curve. 
+		'resolution' parameter determines how many intervals to plot per points.
+		"""
+		ints = ceil(self.p1.distance(self.p3)/resolution)
+		if(ints < 3):
+			ints = 3
+
+		self.points = [self.deCasteljaus(i/ints) for i in range(ints+1)]
+		print(self)
+
 
 	def plot(self):
+		"""
+		Plots the curve using turtle.
+		"""
 		turtle.penup()
-		for i in self.getPoints():
+		turtle.pencolor("red")
+		for i in self.points:
 			turtle.goto(i.x, i.y)
 			turtle.dot()
-		turtle.goto(0,0)	
+
+	def plotBezier(self):
+		"""
+		Plots the curve using turtle.
+		"""
+		turtle.penup()
+		turtle.pencolor("blue")
+		for i in self.getBezierPoints():
+			turtle.goto(i.x, i.y)
+			turtle.dot()
 
 class Path:
 
@@ -164,7 +210,7 @@ class Path:
 		ymax = self.origin.y
 
 		for bez in self.beziers:
-			for point in bez.getPoints():
+			for point in bez.getBezierPoints():
 				if(point.x > xmax):
 					xmax = point.x
 				elif(point.x < xmin):
@@ -181,10 +227,18 @@ class Path:
 		turtle.goto(self.origin.x, self.origin.y)
 		turtle.pendown()
 		for points in self.beziers:
-			for i in points.getPoints():
+			for i in points.points:
 				turtle.goto(i.x, i.y)
 		turtle.penup()
-		turtle.goto(0,0)
+
+	def plotBezier(self):
+		turtle.penup()
+		turtle.goto(self.origin.x, self.origin.y)
+		turtle.pendown()
+		for points in self.beziers:
+			for i in points.getBezierPoints():
+				turtle.goto(i.x, i.y)
+		turtle.penup()
 
 fileName = 'test.eps'
 with open(fileName, 'r') as file:
@@ -202,6 +256,12 @@ p = Path(originData, beziersData)
 
 p.move(-500,-500)
 i = p.beziers[10]
-[print(i) for i in p.beziers]
+print(i)
+#[print(i) for i in p.beziers]
+#print(p.getBounds())
+t = turtle
+p.scale(4)
+p.plot()
+input()
 
 
