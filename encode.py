@@ -10,9 +10,9 @@ RESOLUTION = 3.5 # Resolution When interpolating points from Bezier curve. Highe
 # Regex
 numPattern = r'[0-9\.\-]+'													# Number pattern
 dimensionPattern = r'^%%HiResBoundingBox: (?:[0-9\.\-]*\s?){4}$' 			# Gets page size
-pathPattern = r'^\s+(?:[0-9\.\-]+\s){2}m$.(?:\s+(?:[0-9\.\-]+\s){6}c$)+' 	# Finds all individual paths
+pathPattern = r'^\s+(?:[0-9\.\-]+\s){2}(?:m|l)$.(?:\s+(?:[0-9\.\-]+\s){6}c$)+' 	# Finds all individual paths
 cordPattern = r'(?:[0-9\.\-]+\s?){2}'										# Finds XY coordinate pairs
-originPattern = r'^\s+((?:[0-9\.\-]+\s?){2})m$'								# Finds the origin coordinate
+originPattern = r'^\s+((?:[0-9\.\-]+\s?){2})(?:m|l)$'								# Finds the origin coordinate
 bezierPattern = r'^\s+((?:(?:[0-9\.\-]+\s?){2}){3})c$'						# Finds bezier curve format
 #curvePattern = r'^\s%.*?/DeviceRGB'										# Finds entire curve with all its paths
 #pathPattern = r'^\s+(?:[0-9\.\-]+\s)+(?:m|c)(?:.|\n)+?closepath$'			# Finds seperate paths within curves
@@ -307,7 +307,7 @@ for pathData in pathsData:
 	paths.append(Path(originData, beziersData))
 
 for i in paths:
-	i.scale(2)
+	#i.scale(2)
 	i.move(-250,-230)
 	i.plot()
 
