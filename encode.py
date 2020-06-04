@@ -289,7 +289,7 @@ class Path:
 
 		turtle.penup()
 
-fileName = 'test.eps'
+fileName = 'globe.eps'
 with open(fileName, 'r') as file:
 	data = file.read()
 	file.close()
@@ -299,20 +299,15 @@ paths = []
 
 pathsData = re.findall(pathPattern, data, flags=re.M|re.S)
 
+turtle.speed(0)
+
 for pathData in pathsData:
 	originData = re.findall(originPattern, pathData, flags=re.M)[0]
 	beziersData = re.findall(bezierPattern, pathData, flags=re.M|re.S)
 	paths.append(Path(originData, beziersData))
 
 for i in paths:
-	i.move(-400,-500)
+	i.scale(2)
+	i.move(-250,-230)
 	i.plot()
-
-#p.move(-480,-530)
-#p.scale(8)
-#
-#t = turtle
-#t.speed(10)
-#p.plot()
-#print(p.getBounds())
 
