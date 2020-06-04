@@ -5,7 +5,7 @@ import turtle
 # Conversion constants
 POINT2IN = 1/72
 POINT2MM = POINT2IN*25.4
-RESOLUTION = 6 # Resolution When interpolating points from Bezier curve. 
+RESOLUTION = 10 # Resolution When interpolating points from Bezier curve. 
 
 # Regex
 numPattern = r'[0-9\.\-]+'													# Number pattern
@@ -70,14 +70,15 @@ class Bezier:
 	"""
 	Bezier curve. 
 		- Defined by 3 points: self.p1, self.p2, self.p3
+		- Defined by 4 points: self.p1, self.p2, self.p3 and p0 that's from the previous Bezier curve or an origin point
 		- self.points is an array with the interpolated xy points of the bezier curve
 	"""
 
-	def __init__(self, string=None, p1=None, p2=None, p3=None, p1x=None, p1y=None, p2x=None, p2y=None, p3x=None, p3y=None):
+	def __init__(self, string=None, p0=None, p1=None, p2=None, p3=None):
 		# Constructor, take different kinds of inputs:
-		#	1) String of string="x.x y.y x.x y.y x.x y.y"
-		#	2) 3 Point classes: p1=Point(x,y) ... p3=Point(x,y)
-		#	3) all individual points: p1x=x, p1y=y, ... p3x=x, p3y=y
+		#	1) String="x.x y.y x.x y.y x.x y.y" and p0=(Point|Bezier|str)
+		#	2) 4 Point classes: p1=Point(x,y), p2=Point(x,y), p3=Point(x,y) and p0=(Point|Bezier|str)
+
 		if (not string == None):
 			cords = re.findall(numPattern, string)
 			if(len(cords) == 6):
@@ -90,12 +91,22 @@ class Bezier:
 			self.p1 = p1
 			self.p2 = p2
 			self.p3 = p3
-		elif((not p1x == None) and (not p1y == None) and (not p2x == None) and (not p2y == None) and (not p3x == None) and (not p3y == None)):
-			self.p1 = Point(p1x, p1y)
-			self.p2 = Point(p2x, p2y)
-			self.p3 = Point(p3x, p3y)
 		else:
 			raise ValueError
+
+		if((not p0 == None) and (type(p0) == Bezier)):
+			self.p0 = p0.p3 # Get last Bezier point from the passed Bezier curve
+		elif((not p0 == None) and (type(p0) == Point)):
+			self.p0 = p0 # Use point as previous point
+		elif((not p0 == None) and (type(p0) == str)):
+			cords = re.findall(numPattern, p0)
+			if(len(cords) == 2):
+				x = cords[0]
+				y = cords[1]
+			else:
+				raise ValueError
+		else:
+			self.p0 = None
 
 		self.interpolate()
 
@@ -128,11 +139,15 @@ class Bezier:
 		To render the curve you have to interpolate at several intervals. 
 		The more intervals you interpolate at, the higher the resolution of the curve. 
 
-		Equation: P = P1*(1-t)^2 + 2*P2*(1-t)t + P3*t^2
+		Equation (3 points): P = P1*(1-t)^2 + 2*P2*t*(1-t) + P3*t^2
+		Equation (4 Points): P = P0*(1-t)^3 + 3*P1*t*(1-t)^2 + 3*P2*(1-t)*t^2 + P3*t^3
 		"""
-		
-		x = self.p1.x*(1-t)**2 + 2*self.p2.x*t*(1-t) + self.p3.x*t**2
-		y = self.p1.y*(1-t)**2 + 2*self.p2.y*t*(1-t) + self.p3.y*t**2
+		if(self.p0 == None): # 3 Point interpolation
+			x = self.p1.x*(1-t)**2 + 2*self.p2.x*t*(1-t) + self.p3.x*t**2
+			y = self.p1.y*(1-t)**2 + 2*self.p2.y*t*(1-t) + self.p3.y*t**2
+		else:	# 4 Point interpolation
+			x = self.p0.x*(1-t)**3 + 3*self.p1.x*t*(1-t)**2 + 3*self.p2.x*(1-t)*t**2 + self.p3.x*t**3
+			y = self.p0.y*(1-t)**3 + 3*self.p1.y*t*(1-t)**2 + 3*self.p2.y*(1-t)*t**2 + self.p3.y*t**3
 
 		return Point(x, y)
 
@@ -194,8 +209,12 @@ class Path:
 	def addPoint(self, point):
 		self.beziers.append(point)
 
-	def addBezierFromStringArray(self, arr):
-		[self.beziers.append(Bezier(i)) for i in arr]
+	def addBezierFromStringArray(self, bezierArray):
+		prev = self.origin
+		for bez in bezierArray:
+			new = Bezier(bez, prev)
+			self.beziers.append(new)
+			prev = new
 
 	def move(self, dx, dy):
 		self.origin.move(dx,dy)
@@ -247,7 +266,7 @@ class Path:
 
 		turtle.penup()
 
-fileName = 'thicc.eps'
+fileName = 'test.eps'
 with open(fileName, 'r') as file:
 	data = file.read()
 	file.close()
@@ -260,18 +279,11 @@ originData = re.findall(originPattern, x, flags=re.M)[0]
 beziersData = re.findall(bezierPattern, x, flags=re.M|re.S)
 
 p = Path(originData, beziersData)
-
 p.move(-480,-530)
 p.scale(8)
 
-# Need [Point(-323.852, -341.181), Point(299.833, 371.723)]
-i = p.beziers[10]
-print(i)
-#[print(i) for i in p.beziers]
-#print(p.getBounds())
 t = turtle
 t.speed(10)
-p.plotBezier()
-[x.plot() for x in p.beziers]
-[x.plotBezier() for x in p.beziers]
+p.plot()
+print(p.getBounds())
 
