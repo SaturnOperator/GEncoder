@@ -5,7 +5,7 @@ import turtle
 # Conversion constants
 POINT2IN = 1/72
 POINT2MM = POINT2IN*25.4
-RESOLUTION = 10 # Resolution When interpolating points from Bezier curve. 
+RESOLUTION = 3.5 # Resolution When interpolating points from Bezier curve. Higher # = Lower resolution
 
 # Regex
 numPattern = r'[0-9\.\-]+'													# Number pattern
@@ -35,16 +35,35 @@ class Point:
 
 		self.x = x
 		self.y = y
+		self.originalX = x
+		self.originalY = y
+		self.sizeDeltaX = 1
+		self.sizeDeltaY = 1
+		self.posDeltaX = 0
+		self.posDeltaY = 0
 
 	def move(self, dx, dy):
-		self.x = self.x + dx
-		self.y = self.y + dy
+		self.x += dx
+		self.y += dy
+		self.posDeltaX += dx
+		self.posDeltaY += dy
 
 	def scale(self, dx, dy=None):
 		if(dy == None):
 			dy = dx
-		self.x = self.x * dx
-		self.y = self.y * dy
+		self.x *= dx
+		self.y *= dy
+		self.sizeDeltaX *= dx
+		self.sizeDeltaY *= dy
+
+	def restore(self):
+		# Restores point to its original location
+		self.sizeDeltaX = 1
+		self.sizeDeltaY = 1
+		self.posDeltaX = 0
+		self.posDeltaY = 0
+		self.x = self.originalX
+		self.y = self.originalY
 
 	def getx(self):
 		return self.x
@@ -76,8 +95,8 @@ class Bezier:
 
 	def __init__(self, string=None, p0=None, p1=None, p2=None, p3=None):
 		# Constructor, take different kinds of inputs:
-		#	1) String="x.x y.y x.x y.y x.x y.y" and p0=(Point|Bezier|str)
-		#	2) 4 Point classes: p1=Point(x,y), p2=Point(x,y), p3=Point(x,y) and p0=(Point|Bezier|str)
+		#	1) String="x.x y.y x.x y.y x.x y.y" and p0=(Point|Bezier)
+		#	2) 4 Point classes: p1=Point(x,y), p2=Point(x,y), p3=Point(x,y) and p0=(Point|Bezier)
 
 		if (not string == None):
 			cords = re.findall(numPattern, string)
@@ -98,15 +117,8 @@ class Bezier:
 			self.p0 = p0.p3 # Get last Bezier point from the passed Bezier curve
 		elif((not p0 == None) and (type(p0) == Point)):
 			self.p0 = p0 # Use point as previous point
-		elif((not p0 == None) and (type(p0) == str)):
-			cords = re.findall(numPattern, p0)
-			if(len(cords) == 2):
-				x = cords[0]
-				y = cords[1]
-			else:
-				raise ValueError
 		else:
-			self.p0 = None
+			raise ValueError
 
 		self.interpolate()
 
@@ -123,6 +135,11 @@ class Bezier:
 		self.p2.scale(dx, dy)
 		self.p3.scale(dx, dy)
 		self.interpolate()
+
+	def restore(self):
+		self.p1.restore
+		self.p2.restore
+		self.p3.restore
 
 	def __str__(self):
 		return "Bezier Curve { P1: %s, P2: %s, P3: %s }" % (self.p1, self.p2, self.p3)
@@ -161,7 +178,6 @@ class Bezier:
 			ints = 1
 
 		self.points = [self.deCasteljaus(i/ints) for i in range(ints+1)]
-		print(self)
 
 
 	def plot(self):
@@ -226,6 +242,13 @@ class Path:
 		self.origin.scale(dx,dy)
 		[i.scale(dx, dy) for i in self.beziers]
 
+	def restore(self):
+		self.origin.restore()
+		[i.restore() for i in self.beziers]
+
+	def interpolate(self, res=RESOLUTION):
+		[i.interpolate(res) for i in self.beziers]
+
 	def getBounds(self):
 		xmin = self.origin.x
 		ymin = self.origin.y
@@ -249,7 +272,7 @@ class Path:
 		turtle.penup()
 		turtle.goto(self.origin.x, self.origin.y)
 		turtle.pendown()
-		t.pencolor("black")
+		turtle.pencolor("black")
 		for points in self.beziers:
 			for i in points.points:
 				turtle.goto(i.x, i.y)
@@ -271,19 +294,25 @@ with open(fileName, 'r') as file:
 	data = file.read()
 	file.close()
 
+
+paths = []
+
 pathsData = re.findall(pathPattern, data, flags=re.M|re.S)
 
-x = pathsData[-1]
+for pathData in pathsData:
+	originData = re.findall(originPattern, pathData, flags=re.M)[0]
+	beziersData = re.findall(bezierPattern, pathData, flags=re.M|re.S)
+	paths.append(Path(originData, beziersData))
 
-originData = re.findall(originPattern, x, flags=re.M)[0]
-beziersData = re.findall(bezierPattern, x, flags=re.M|re.S)
+for i in paths:
+	i.move(-400,-500)
+	i.plot()
 
-p = Path(originData, beziersData)
-p.move(-480,-530)
-p.scale(8)
-
-t = turtle
-t.speed(10)
-p.plot()
-print(p.getBounds())
+#p.move(-480,-530)
+#p.scale(8)
+#
+#t = turtle
+#t.speed(10)
+#p.plot()
+#print(p.getBounds())
 
