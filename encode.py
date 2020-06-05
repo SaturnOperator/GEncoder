@@ -2,6 +2,12 @@ import re
 from math import sqrt, ceil
 import turtle
 
+# Code Settings:
+MOVE_UP = "G1 Z2.5 F1200; S0"
+MOVE_DOWN = "G1 Z0.5 F1200; S255"
+DRAW_SPEED = "G1 F10000"
+TRAVEL_SPEED = "G1 F12000"
+
 # Conversion constants
 POINT2IN = 1/72
 POINT2MM = POINT2IN*25.4
@@ -82,6 +88,9 @@ class Point:
 
 	def get(self):
 		return [self.x, self.y]
+
+	def getGcode(self):
+		return "G0 X%0.3f Y%0.3f" % (self.x, self.y)
 
 class Bezier:
 	"""
@@ -288,6 +297,18 @@ class Path:
 
 		turtle.penup()
 
+	def getGcode(self):
+		gcode = []
+		gcode.append(MOVE_UP)
+		gcode.append(TRAVEL_SPEED)
+		gcode.append(self.origin.getGcode())
+		gcode.append(MOVE_DOWN)
+		for points in self.beziers:
+			for i in points.points:
+				gcode.append(i.getGcode())
+		gcode.append(MOVE_UP)
+		return gcode
+
 class Group:
 
 	def __init__(self, paths):
@@ -330,6 +351,16 @@ class Group:
 
 		return [Point(xmin, ymin), Point(xmax, ymax)]
 
+	def getGcode(self):
+		return [cmd for path in self.paths for cmd in path.getGcode()]
+
+def generateGcode(gcode):
+	output = ""
+	for cmd in gcode:
+		output += cmd + "\n"
+	output += "G0 X0 Y0"
+	return output
+
 def drawRectangle(p1, p2):
 	turtle.goto(p1.get())
 	turtle.pendown()
@@ -339,7 +370,7 @@ def drawRectangle(p1, p2):
 	turtle.goto(p1.get())
 	turtle.penup()	
 
-fileName = 'globe.eps'
+fileName = 'hello.eps'
 with open(fileName, 'r') as file:
 	data = file.read()
 	file.close()
@@ -358,6 +389,6 @@ for pathData in pathsData:
 i = Group(paths)
 i.scale(POINT2MM)
 [d.scale(POINT2MM) for d in dimensions]
-
-
-
+i.move(50,0)
+gcode = generateGcode(i.getGcode())
+print(gcode)
