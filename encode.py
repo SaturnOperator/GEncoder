@@ -8,14 +8,12 @@ POINT2MM = POINT2IN*25.4
 RESOLUTION = 3.5 # Resolution When interpolating points from Bezier curve. Higher # = Lower resolution
 
 # Regex
-numPattern = r'[0-9\.\-]+'													# Number pattern
-dimensionPattern = r'^%%HiResBoundingBox: (?:[0-9\.\-]*\s?){4}$' 			# Gets page size
-pathPattern = r'^\s+(?:[0-9\.\-]+\s){2}(?:m|l)$.(?:\s+(?:[0-9\.\-]+\s){6}c$)+' 	# Finds all individual paths
-cordPattern = r'(?:[0-9\.\-]+\s?){2}'										# Finds XY coordinate pairs
-originPattern = r'^\s+((?:[0-9\.\-]+\s?){2})(?:m|l)$'								# Finds the origin coordinate
-bezierPattern = r'^\s+((?:(?:[0-9\.\-]+\s?){2}){3})c$'						# Finds bezier curve format
-#curvePattern = r'^\s%.*?/DeviceRGB'										# Finds entire curve with all its paths
-#pathPattern = r'^\s+(?:[0-9\.\-]+\s)+(?:m|c)(?:.|\n)+?closepath$'			# Finds seperate paths within curves
+numPattern = r'[0-9\.\-]+'														# Number pattern
+dimensionPattern = r'^%%HiResBoundingBox:\s*((?:[0-9\.\-]*\s?){4})$'			# Gets page size
+pathPattern = r'^\s+(?:[0-9\.\-]+\s){2}[ml]$.(?:\s+(?:[0-9\.\-]+\s){6}c$)+' 	# Finds all individual paths
+originPattern = r'^\s+((?:[0-9\.\-]+\s?){2})[ml]$'								# Finds the origin coordinate
+bezierPattern = r'^\s+((?:(?:[0-9\.\-]+\s?){2}){3})c$'							# Finds bezier curve format
+#cordPattern = r'(?:[0-9\.\-]+\s?){2}'											# Finds XY coordinate pairs
 
 class Point:
 	def __init__(self, x=None, y=None, string=None):
@@ -137,9 +135,10 @@ class Bezier:
 		self.interpolate()
 
 	def restore(self):
-		self.p1.restore
-		self.p2.restore
-		self.p3.restore
+		self.p1.restore()
+		self.p2.restore()
+		self.p3.restore()
+		self.interpolate()
 
 	def __str__(self):
 		return "Bezier Curve { P1: %s, P2: %s, P3: %s }" % (self.p1, self.p2, self.p3)
@@ -289,25 +288,76 @@ class Path:
 
 		turtle.penup()
 
+class Group:
+
+	def __init__(self, paths):
+		self.paths = paths
+
+	def move(self, dx, dy):
+		[i.move(dx, dy) for i in self.paths]
+
+	def scale(self, dx, dy=None):
+		if(dy == None):
+			dy = dx
+		[i.scale(dx, dy) for i in self.paths]
+	
+	def restore(self):
+		[i.restore() for i in self.paths]
+
+	def plot(self):
+		[i.plot() for i in self.paths]
+
+	def plotBezier(self):
+		[i.plotBezier() for i in self.paths]
+
+	def getBounds(self):
+		bounds = [i.getBounds() for i in self.paths]
+
+		xmin = bounds[0][0].get()[0]
+		ymin = bounds[0][0].get()[1]
+		xmax = bounds[0][1].get()[0]
+		ymax = bounds[0][1].get()[1]
+
+		for point in bounds:
+			if(point[1].get()[0] > xmax):
+				xmax = point[1].get()[0]
+			elif(point[0].get()[0] < xmin):
+				xmin = point[0].get()[0]
+			if(point[1].get()[1] > ymax):
+				ymax = point[1].get()[1]
+			elif(point[0].get()[1] < ymin):
+				ymin = point[0].get()[1]
+
+		return [Point(xmin, ymin), Point(xmax, ymax)]
+
+def drawRectangle(p1, p2):
+	turtle.goto(p1.get())
+	turtle.pendown()
+	turtle.goto(p2.x, p1.y)
+	turtle.goto(p2.get())
+	turtle.goto(p1.x, p2.y)
+	turtle.goto(p1.get())
+	turtle.penup()	
+
 fileName = 'globe.eps'
 with open(fileName, 'r') as file:
 	data = file.read()
 	file.close()
 
+dimensionData = re.findall(numPattern, re.findall(dimensionPattern, data, flags=re.M)[0])
+dimensions = [Point(dimensionData[0], dimensionData[1]), Point(dimensionData[2], dimensionData[3])]
 
 paths = []
-
 pathsData = re.findall(pathPattern, data, flags=re.M|re.S)
-
-turtle.speed(0)
 
 for pathData in pathsData:
 	originData = re.findall(originPattern, pathData, flags=re.M)[0]
 	beziersData = re.findall(bezierPattern, pathData, flags=re.M|re.S)
 	paths.append(Path(originData, beziersData))
 
-for i in paths:
-	#i.scale(2)
-	i.move(-250,-230)
-	i.plot()
+i = Group(paths)
+i.scale(POINT2MM)
+[d.scale(POINT2MM) for d in dimensions]
+
+
 
