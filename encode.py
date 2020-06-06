@@ -1,9 +1,12 @@
 import re
 from math import sqrt, ceil
 import turtle
+import copy
 
-FILE_NAME = 'frame.eps'
-RESOLUTION = 3.5 # Resolution When interpolating points from Bezier curve. Higher # = Lower resolution
+FILE_NAME = 'frame.eps'	# EPS file input
+RESOLUTION = 3.5		# Resolution When interpolating points from Bezier curve. Higher # = Lower resolution
+UNITS = "mm"			# (mm|in)
+VISUAL_SCALE = 20		# Resizes preview
 
 # Gcode Settings:
 MOVE_UP = "G1 Z5.9 F1200; S0" #2.5
@@ -12,10 +15,10 @@ DRAW_SPEED = "G1 F10000"
 TRAVEL_SPEED = "G1 F10000"
 ORIGIN_OFFSET = (5, 5)
 
-# Conversion constants
+# Conversion constants -- Don't change these
 POINT2IN = 1/72
 POINT2MM = POINT2IN*25.4
-VISUAL_SCALE = 20
+UNITS_SCALE = POINT2IN if (UNITS == 'in' or UNITS == 'inches') else POINT2MM
 
 # Regex
 numPattern = r'[0-9\.\-]+'														# Number pattern
@@ -24,6 +27,9 @@ pathPattern = r'^\s+(?:[0-9\.\-]+\s){2}[ml]$.(?:\s+(?:[0-9\.\-]+\s){6}c$)+' 	# F
 originPattern = r'^\s+((?:[0-9\.\-]+\s?){2})[ml]$'								# Finds the origin coordinate
 bezierPattern = r'^\s+((?:(?:[0-9\.\-]+\s?){2}){3})c$'							# Finds bezier curve format
 #cordPattern = r'(?:[0-9\.\-]+\s?){2}'											# Finds XY coordinate pairs
+
+# Other
+PLOTTED = 0
 
 class Point:
 	def __init__(self, x=None, y=None, string=None):
@@ -366,6 +372,13 @@ class Group:
 
 def generateGcode(gcode):
 	output = ""
+	if(UNITS == 'in' or UNITS == 'inches'):
+		output += "G20 ; set units to inches\n"
+	elif(UNITS == 'mm'):
+		output += "G21 ; set units to mm\n"
+	else:
+		raise ValueError
+
 	for cmd in gcode:
 		output += cmd + "\n"
 	output += "G0 X0 Y0"
@@ -380,20 +393,6 @@ def drawRectangle(p1, p2):
 	turtle.goto(p1.x, p2.y)
 	turtle.goto(p1.get())
 	turtle.penup()
-
-def preview(group):
-	group.move(-ORIGIN_OFFSET[0],-ORIGIN_OFFSET[1])
-	group.move(-dimensions[1].x/2,-dimensions[1].y/2)
-	group.scale(POINT2MM*VISUAL_SCALE)
-	[d.scale(POINT2MM*VISUAL_SCALE) for d in dimensions]
-	turtle.setup(width=dimensions[1].x*1.3, height=dimensions[1].y*1.3, startx=0, starty=0)
-	dimensions[0].move(-dimensions[1].x/2,-dimensions[1].y/2)
-	dimensions[1].move(-dimensions[1].x/2,-dimensions[1].y/2)
-	turtle.tracer(0,0)
-	turtle.pencolor("red")
-	drawRectangle(dimensions[0],dimensions[1])
-	group.plot()
-	turtle.mainloop()
 
 with open(FILE_NAME, 'r') as file:
 	data = file.read()
@@ -411,8 +410,8 @@ for pathData in pathsData:
 	paths.append(Path(originData, beziersData))
 
 i = Group(paths)
-i.scale(POINT2MM)
-[d.scale(POINT2MM) for d in dimensions]
+i.scale(UNITS_SCALE)
+[d.scale(UNITS_SCALE) for d in dimensions]
 i.move(ORIGIN_OFFSET[0],ORIGIN_OFFSET[1])
 gcode = generateGcode(i.getGcode())
 print(gcode)
@@ -422,5 +421,16 @@ with open(FILE_NAME+'.gcode', 'w') as file:
 	file.write(gcode)
 	file.close()
 
-#exit()
-preview(i)
+preview = copy.copy(i)
+preview.move(-ORIGIN_OFFSET[0],-ORIGIN_OFFSET[1])
+preview.move(-dimensions[1].x/2,-dimensions[1].y/2)
+preview.scale(VISUAL_SCALE * POINT2MM * ( (1/POINT2IN)*POINT2MM if(UNITS_SCALE == POINT2IN) else 1))
+[d.scale(VISUAL_SCALE * POINT2MM * ( (1/POINT2IN)*POINT2MM if(UNITS_SCALE == POINT2IN) else 1)) for d in dimensions]
+turtle.setup(width=dimensions[1].x*1.3, height=dimensions[1].y*1.3, startx=0, starty=0)
+turtle.tracer(0,0)
+dimensions[0].move(-dimensions[1].x/2,-dimensions[1].y/2)
+dimensions[1].move(-dimensions[1].x/2,-dimensions[1].y/2)
+turtle.pencolor("red")
+drawRectangle(dimensions[0],dimensions[1])
+preview.plot()
+turtle.mainloop()
