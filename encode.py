@@ -5,7 +5,7 @@ import copy
 
 FILE_NAME = 'frame.eps'	# EPS file input
 RESOLUTION = 3.5		# Resolution When interpolating points from Bezier curve. Higher # = Lower resolution
-UNITS = "mm"			# (mm|in)
+UNITS = "mm"			# (mm) #inches is still WIP
 VISUAL_SCALE = 20		# Resizes preview
 
 # Gcode Settings:
