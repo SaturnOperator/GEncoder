@@ -2,16 +2,20 @@ import re
 from math import sqrt, ceil
 import turtle
 
-# Code Settings:
-MOVE_UP = "G1 Z2.5 F1200; S0"
-MOVE_DOWN = "G1 Z0.5 F1200; S255"
+FILE_NAME = 'frame.eps'
+RESOLUTION = 3.5 # Resolution When interpolating points from Bezier curve. Higher # = Lower resolution
+
+# Gcode Settings:
+MOVE_UP = "G1 Z5.9 F1200; S0" #2.5
+MOVE_DOWN = "G1 Z3.5 F1200; S255" #0
 DRAW_SPEED = "G1 F10000"
-TRAVEL_SPEED = "G1 F12000"
+TRAVEL_SPEED = "G1 F10000"
+ORIGIN_OFFSET = (5, 5)
 
 # Conversion constants
 POINT2IN = 1/72
 POINT2MM = POINT2IN*25.4
-RESOLUTION = 3.5 # Resolution When interpolating points from Bezier curve. Higher # = Lower resolution
+VISUAL_SCALE = 20
 
 # Regex
 numPattern = r'[0-9\.\-]+'														# Number pattern
@@ -46,11 +50,21 @@ class Point:
 		self.posDeltaX = 0
 		self.posDeltaY = 0
 
+	def get(self):
+		return [self.x, self.y]
+
+	def getx(self):
+		return self.x
+
+	def gety(self):
+		return self.y
+
 	def move(self, dx, dy):
 		self.x += dx
 		self.y += dy
 		self.posDeltaX += dx
 		self.posDeltaY += dy
+		return self.get()
 
 	def scale(self, dx, dy=None):
 		if(dy == None):
@@ -59,6 +73,7 @@ class Point:
 		self.y *= dy
 		self.sizeDeltaX *= dx
 		self.sizeDeltaY *= dy
+		return self.get()
 
 	def restore(self):
 		# Restores point to its original location
@@ -68,12 +83,7 @@ class Point:
 		self.posDeltaY = 0
 		self.x = self.originalX
 		self.y = self.originalY
-
-	def getx(self):
-		return self.x
-
-	def gety(self):
-		return self.y
+		return self.get()
 
 	def distance(self, other):
 		dx = self.x - other.x
@@ -85,9 +95,6 @@ class Point:
 
 	def __repr__(self):
 		return str(self)
-
-	def get(self):
-		return [self.x, self.y]
 
 	def getGcode(self):
 		return "G0 X%0.3f Y%0.3f" % (self.x, self.y)
@@ -325,6 +332,9 @@ class Group:
 	def restore(self):
 		[i.restore() for i in self.paths]
 
+	def interpolate(self, res=RESOLUTION):
+		[i.interpolate(res) for i in self.paths]
+
 	def plot(self):
 		[i.plot() for i in self.paths]
 
@@ -362,16 +372,30 @@ def generateGcode(gcode):
 	return output
 
 def drawRectangle(p1, p2):
+	turtle.penup()	
 	turtle.goto(p1.get())
 	turtle.pendown()
 	turtle.goto(p2.x, p1.y)
 	turtle.goto(p2.get())
 	turtle.goto(p1.x, p2.y)
 	turtle.goto(p1.get())
-	turtle.penup()	
+	turtle.penup()
 
-fileName = 'hello.eps'
-with open(fileName, 'r') as file:
+def preview(group):
+	group.move(-ORIGIN_OFFSET[0],-ORIGIN_OFFSET[1])
+	group.move(-dimensions[1].x/2,-dimensions[1].y/2)
+	group.scale(POINT2MM*VISUAL_SCALE)
+	[d.scale(POINT2MM*VISUAL_SCALE) for d in dimensions]
+	turtle.setup(width=dimensions[1].x*1.3, height=dimensions[1].y*1.3, startx=0, starty=0)
+	dimensions[0].move(-dimensions[1].x/2,-dimensions[1].y/2)
+	dimensions[1].move(-dimensions[1].x/2,-dimensions[1].y/2)
+	turtle.tracer(0,0)
+	turtle.pencolor("red")
+	drawRectangle(dimensions[0],dimensions[1])
+	group.plot()
+	turtle.mainloop()
+
+with open(FILE_NAME, 'r') as file:
 	data = file.read()
 	file.close()
 
@@ -389,6 +413,14 @@ for pathData in pathsData:
 i = Group(paths)
 i.scale(POINT2MM)
 [d.scale(POINT2MM) for d in dimensions]
-i.move(50,0)
+i.move(ORIGIN_OFFSET[0],ORIGIN_OFFSET[1])
 gcode = generateGcode(i.getGcode())
 print(gcode)
+print("; Number Points: %d" % len(i.getGcode()))
+
+with open(FILE_NAME+'.gcode', 'w') as file:
+	file.write(gcode)
+	file.close()
+
+#exit()
+preview(i)
